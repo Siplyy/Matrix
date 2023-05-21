@@ -12,16 +12,13 @@ using std::vector;
 using std::cerr;
 
 //Errors
-struct Exception {
-    std::string err;
+struct NSquareMatrixException : public std::runtime_error {
+public:
+    NSquareMatrixException(const std::string &message) : std::runtime_error(message) {}
 };
 
-struct NSquareMatrix : public Exception {
-    NSquareMatrix() { err = "The matrix is not square"; }
-};
-
-struct SizeMismatchErr : public Exception {
-    SizeMismatchErr() { err = "Action cannot be performed with matrices of different sizes"; }
+struct SizeMismatchException : public std::runtime_error {
+    SizeMismatchException(const std::string &message) : std::runtime_error(message) {}
 };
 
 template<typename T>
@@ -31,7 +28,7 @@ public:
     Matrix() {
         this->n = 0;
         this->m = 0;
-        this->data = NULL;
+        this->data = nullptr;
     };
 
     //Console constructor that only reads the size
@@ -41,17 +38,18 @@ public:
     };
 
     //Console constructor
-    Matrix(size_t N, size_t M, vector<vector<T> > ma) {
+    Matrix(size_t N, size_t M, const vector<vector<T> > values) {
         this->n = N;
         this->m = M;
-        this->data = ma;
+        this->data = values;
     };
 
     //Copy constructor
-    Matrix(Matrix<T> &matrix) {
+    Matrix(const Matrix<T> &matrix) {
         this->n = matrix.n;
         this->m = matrix.m;
-        this->data = matrix.data;
+        vector<vector<T> > values = matrix.data;
+        this->data = values;
     };
 
     //File constructor
@@ -60,6 +58,9 @@ public:
         if (in.is_open()) {
             size_t N, M;
             in >> N >> M;
+            if ((N == 0) || (M == 0)) {
+                throw std::runtime_error("The dimensions of the given matrix cannot be equal to 0.");
+            }
             this->n = N;
             this->m = M;
             vector<vector<T> > a;
@@ -74,7 +75,7 @@ public:
             }
             this->data = a;
         } else {
-            cerr << "Error opening file";
+            throw std::runtime_error("file is not open");
         }
     };
 
@@ -84,19 +85,19 @@ public:
         this->n = N;
         this->m = M;
         if (in.is_open()) {
-            vector<vector<T> > a;
+            vector<vector<T> > values;
             for (size_t i = 0; i < N; ++i) {
-                vector<T> a2;
+                vector<T> line;
                 for (size_t j = 0; j < M; ++j) {
-                    T k = 0;
-                    in >> k;
-                    a2.push_back(k);
+                    T value = 0;
+                    in >> value;
+                    line.push_back(value);
                 }
-                a.push_back(a2);
+                values.push_back(line);
             }
-            this->data = a;
+            this->data = values;
         } else {
-            cerr << "Error opening file";
+            throw std::runtime_error("file is not open");
         }
     };
 
@@ -106,140 +107,87 @@ public:
         this->n = N;
         this->m = M;
         if (type == "0") {
-            vector<vector<T> > matrz;
+            vector<vector<T> > values(n, vector<T>(m, 0));
+            this->data = values;
+        } else if ((type == "1") && (N == M)) {
+            vector<vector<T> > values;
             for (size_t i = 0; i < N; ++i) {
-                vector<T> a2;
-                for (size_t j = 0; j < M; ++j) {
-                    a2.push_back(0);
-                }
-                matrz.push_back(a2);
-            }
-            this->data = matrz;
-        }
-        if ((type == "1") && (N == M)) {
-            vector<vector<T> > matrz;
-            for (size_t i = 0; i < N; ++i) {
-                vector<T> a2;
+                vector<T> line;
                 for (size_t j = 0; j < M; ++j) {
                     if (i == j) {
-                        a2.push_back(1);
+                        line.push_back(1);
                     } else {
-                        a2.push_back(0);
+                        line.push_back(0);
                     }
                 }
-                matrz.push_back(a2);
+                values.push_back(line);
             }
-            this->data = matrz;
-        }
-        if (n != m) {
-            std::cerr << "Non-standard matrix introduced";
-        }
+            this->data = values;
+        } else { throw std::runtime_error("Non-standard matrix introduced"); }
     };
 
     //Assignment operator
     Matrix<T> &operator=(const Matrix<T> &B) {
-        if ((n = B.n) && (m = B.m)) {
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    data[i][j] += B.data[i][j];
-                }
-            }
-            return *this;
-        } else {
-            SizeMismatchErr err;
-            throw err;
+        if ((this->n != B.n) || (this->m != B.m)) {
+            throw SizeMismatchException("Action cannot be performed with matrices of different sizes");
         }
-    };
-
-    //Addition operator
-    Matrix<T> &operator+(const Matrix<T> &B) {
-        if ((n == B.n) && (m == B.m)) {
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    data[i][j] += B.data[i][j];
-                }
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->m; ++j) {
+                this->data[i][j] = B.data[i][j];
             }
-            return *this;
-        } else {
-            SizeMismatchErr err;
-            throw err;
         }
-    };
-
-    //subtraction operator
-    const Matrix<T> &operator-(const Matrix<T> &B) {
-        if (n == B.n and m == B.m) {
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    data[i][j] -= B.data[i][j];
-                }
-            }
-            return *this;
-        } else {
-            SizeMismatchErr error;
-            throw error;
-        }
+        return *this;
     };
 
     //Comparison operator for two matrices
     bool operator==(const Matrix<T> &B) {
-        if ((n = B.n) && (m = B.m)) {
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    if (data[i][j] != B.data[i][j]) {
-                        cout << "The matrices are different" << endl;
-                        return false;
-                    }
+        if ((this->n != B.n) || (this->m != B.m)) {
+            return false;
+        }
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->m; ++j) {
+                if (this->data[i][j] != B.data[i][j]) {
+                    return false;
                 }
             }
-            cout << "The matrices are equal";
-            return true;
-        } else {
-            SizeMismatchErr error;
-            throw error;
         }
+        return true;
     };
 
     //
     bool operator!=(const Matrix<T> &B) {
-        if ((n = B.n) && (m = B.m)) {
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    if (data[i][j] != B.data[i][j]) {
-                        cout << "The matrices are different" << endl;
-                        return true;
-                    }
+        if ((this->n != B.n) || (this->m != B.m)) {
+            return false;
+        }
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->m; ++j) {
+                if (this->data[i][j] != B.data[i][j]) {
+                    return true;
                 }
             }
-            cout << "The matrices are equal";
-            return false;
-        } else {
-            SizeMismatchErr error;
-            throw error;
         }
+        return false;
     };
 
     //Operator for comparing matrices with typical ones
     bool operator==(string a) {
         if (a == "0") {
-            Matrix<T> B(a, n, m);
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    if (data[i][j] != B.data[i][j]) {
-                        cout << "The matrices are different" << endl;
+            Matrix<T> B(a, this->n, this->m);
+            for (size_t i = 0; i < this->n; ++i) {
+                for (size_t j = 0; j < this->m; ++j) {
+                    if (this->data[i][j] != B.data[i][j]) {
                         return false;
                     }
                 }
             }
-            cout << "The matrices are equal" << endl;
             return true;
         }
         if (a == "1") {
-            if (n == m) {
-                Matrix<T> B(a, n, m);
-                for (size_t i = 0; i < n; ++i) {
-                    for (size_t j = 0; j < m; ++j) {
-                        if (data[i][j] != B.data[i][j]) {
+            if (this->n == this->m) {
+                Matrix<T> B(a, this->n, this->m);
+                for (size_t i = 0; i < this->n; ++i) {
+                    for (size_t j = 0; j < this->m; ++j) {
+                        if (this->data[i][j] != B.data[i][j]) {
                             return false;
                         }
                     }
@@ -249,31 +197,29 @@ public:
                 return false;
             }
         } else {
-            std::cerr << "Non-standard matrix introduced";
+            throw std::runtime_error("Non-standard matrix introduced");
         }
     };
 
     // != Operator for comparing matrices with typical ones
     bool operator!=(string a) {
         if (a == "0") {
-            Matrix<T> B(a, n, m);
-            for (size_t i = 0; i < n; ++i) {
-                for (size_t j = 0; j < m; ++j) {
-                    if (data[i][j] != B.data[i][j]) {
-                        cout << "The matrices are different" << endl;
+            Matrix<T> B(a, this->n, this->m);
+            for (size_t i = 0; i < this->n; ++i) {
+                for (size_t j = 0; j < this->m; ++j) {
+                    if (this->data[i][j] != B.data[i][j]) {
                         return true;
                     }
                 }
             }
-            cout << "The matrices are equal" << endl;
             return false;
         }
         if (a == "1") {
-            if (n == m) {
-                Matrix<T> B(a, n, m);
-                for (size_t i = 0; i < n; ++i) {
-                    for (size_t j = 0; j < m; ++j) {
-                        if (data[i][j] != B.data[i][j]) {
+            if (this->n == this->m) {
+                Matrix<T> B(a, this->n, this->m);
+                for (size_t i = 0; i < this->n; ++i) {
+                    for (size_t j = 0; j < this->m; ++j) {
+                        if (this->data[i][j] != B.data[i][j]) {
                             return true;
                         }
                     }
@@ -283,54 +229,77 @@ public:
                 return false;
             }
         } else {
-            cerr << "Non-standard matrix introduced";
+            throw std::runtime_error("Non-standard matrix introduced");
         }
+    };
+
+    //Addition operator
+    Matrix<T> operator+(const Matrix<T> &B) {
+        if ((this->n != B.n) || (this->m != B.m)) {
+            throw SizeMismatchException("Action cannot be performed with matrices of different sizes");
+        }
+        Matrix<T> Result("0", this->n, this->m);
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->m; ++j) {
+                Result.data[i][j] = this->data[i][j] + B.data[i][j];
+            }
+        }
+        return Result;
+    };
+
+    //subtraction operator
+    const Matrix<T> operator-(const Matrix<T> &B) {
+        if ((this->n != B.n) || (this->m != B.m)) {
+            throw SizeMismatchException("Action cannot be performed with matrices of different sizes");
+        }
+        Matrix<T> Result("0", this->n, this->m);
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->m; ++j) {
+                Result.data[i][j] = this->data[i][j] - B.data[i][j];
+            }
+        }
+        return Result;
     };
 
     // Matrix multiplication operator
     Matrix<T> operator*(const Matrix<T> &B) {
-        if (m != B.n) {
-            SizeMismatchErr error;
-            throw error;
+        if (this->m != B.n) {
+            throw SizeMismatchException("Action cannot be performed with matrices of different sizes");
 
         }
-        Matrix<T> D("0", n, B.m);
-        for (size_t i = 0; i < n; ++i) {
+        Matrix<T> Result("0", this->n, B.m);
+        for (size_t i = 0; i < this->n; ++i) {
             for (size_t j = 0; j < B.m; ++j) {
                 size_t k = 0;
                 size_t l = 0;
-                while ((k < m) && (l < B.n)) {
-                    D.data[i][j] += data[i][k] * B.data[l][j];
+                while ((k < this->m) && (l < B.n)) {
+                    Result.data[i][j] += this->data[i][k] * B.data[l][j];
                     k += 1;
                     l += 1;
                 }
             }
         }
-        this->data = D.data;
-        this->n = D.n;
-        this->m = D.m;
-        return *this;
+        return Result;
     }
 
-    // Сreating an inverse matrix
+    // Creating an inverse matrix
     Matrix<T> operator!() {
-        if (n != m) {
-            NSquareMatrix err;
-            throw err;
+        if (this->n != this->m) {
+            throw NSquareMatrixException("Action cannot be performed with non square matrix");
         }
         if (this->det() == 0) {
-            cerr << "This matrix doesn't have inverse matrix";
+            throw std::runtime_error("This matrix doesn't have inverse matrix");
         }
         T det = this->det();
-        Matrix<T> Result("0", n, n);
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < n; ++j) {
+        Matrix<T> Result("0", this->n, this->n);
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->n; ++j) {
                 Result.data[i][j] = this->AlgComplement(i, j);
             }
         }
         Result.Transpose();
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < n; ++j) {
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->n; ++j) {
                 Result.data[i][j] /= det;
             }
         }
@@ -339,9 +308,9 @@ public:
 
     // Matrix transposition
     Matrix<T> Transpose() {
-        Matrix<T> trans("0", m, n);
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < m; ++j) {
+        Matrix<T> trans("0", this->m, this->n);
+        for (size_t i = 0; i < this->n; ++i) {
+            for (size_t j = 0; j < this->m; ++j) {
                 trans.data[i][j] = this->data[j][i];
             }
         }
@@ -350,40 +319,38 @@ public:
 
     //Counting the determinant
     T det() {
-        if (n != m) {
-            NSquareMatrix err;
-            throw err;
+        if (this->n != this->m) {
+            throw NSquareMatrixException("Action cannot be performed with non square matrix");
         }
-        if (n == 1)
-            return data[0][0];
+        if (this->n == 1)
+            return this->data[0][0];
         T sum = 0;
-        for (size_t j = 0; j < n; ++j) {
-            sum += data[0][j] * this->AlgComplement(0, j);
+        for (size_t j = 0; j < this->n; ++j) {
+            sum += this->data[0][j] * this->AlgComplement(0, j);
         }
         return sum;
     }
 
     //Creation of a minor
-    T Minor(size_t i_, size_t j_) {
-        if (n == m) {
-            Matrix<T> matrix("0", n - 1, m - 1);
-            size_t k = 0;
-            for (size_t i = 0; i < n; ++i) {
-                size_t h = 0;
-                for (size_t j = 0; j < n; ++j) {
-                    if (i != i_ && j != j_) {
-                        matrix.data[k][h] = data[i][j];
-                        h++;
-                    }
-                }
-                if (i != i_)
-                    k++;
-            }
-            return matrix.det();
-        } else {
-            NSquareMatrix error;
-            throw error;
+    T Minor(size_t pos_n, size_t pos_m) {
+        if (this->n != this->m) {
+            throw NSquareMatrixException("Action cannot be performed with non square matrix");
         }
+        Matrix<T> matrix("0", this->n - 1, this->m - 1);
+        size_t pos_n1 = 0;
+        for (size_t i = 0; i < this->n; ++i) {
+            size_t pos_m1 = 0;
+            for (size_t j = 0; j < this->n; ++j) {
+                if (i != pos_n && j != pos_m) {
+                    matrix.data[pos_n1][pos_m1] = this->data[i][j];
+                    pos_m1++;
+                }
+            }
+            if (i != pos_n) {
+                pos_n1++;
+            }
+        }
+        return matrix.det();
     }
 
     //Counting Algebraic Complement
@@ -411,7 +378,7 @@ public:
             }
             cout << endl;
         } else {
-            cout << "Матрица пуста" << endl;
+            cout << "Matrix is empty" << endl;
         }
     }
 
@@ -438,24 +405,36 @@ int main() {
             data1.push_back(a1);
         }
         Matrix<double> A(n1, m1, data1);
-        cout << A.det();
+        cout << "Determinate of matrix A" << endl;
+        cout << A.det() << endl;
+
+        cout << "Enter dimensions of matrix B" << endl;
+        size_t n2, m2;
+        cin >> n2 >> m2;
+        Matrix<double> B("0", n1, m1);
+
+        cout << "Inverse matrix for A" << endl;
+        B = !A;
+        B.Matrix_print();
+
+        Matrix<double> C("0", n1, m1);
+        C = A + B;
+        cout << "A + inverse A" << endl;
+        C.Matrix_print();
+
+        Matrix<double> D("0", n1, m1);
+        cout << "A * Inverse A" << endl;
+        D = A * B;
+        D.Matrix_print();
     }
-    catch (Exception &err) {
-        cout << err.err;
+    catch (const NSquareMatrixException &e) {
+        std::cerr << "Exception NSquareMatrix: " << e.what() << std::endl;
     }
+    catch (const SizeMismatchException &e) {
+        std::cerr << "Exception SizeMismatch: " << e.what() << std::endl;
+    }
+    catch (const std::exception &e) {
+        std::cerr << "Exception: " << e.what() << std::endl;
+    }
+    return 0;
 }
-//    cout << "Enter dimensions of matrix B" << endl;
-//    size_t n2, m2;
-//    cin >> n2 >> m2;
-//    cout << "Enter the data of matrix B" << endl;
-//    vector<vector<double> > data2;
-//    for (size_t i = 0; i < n2; ++i) {
-//        vector<double> a2;
-//        for (size_t j = 0; j < m2; ++j) {
-//            double a = 0;
-//            cin >> a;
-//            a2.push_back(a);
-//        }
-//        data2.push_back(a2);
-//    }
-//    Matrix<double> B(n2,m2,data2);
